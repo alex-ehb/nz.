@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naza</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX for rendering mathematical formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #05070a;
+            color: #f3f4f6;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1f293d;
+            border-radius: 3px;
+        }
+
+        /* Glowing effects */
+        .neon-glow {
+            box-shadow: 0 0 25px -5px var(--glow-color, rgba(255, 42, 109, 0.4));
+        }
+
+        .pulse-slow {
+            animation: pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.06); opacity: 0.85; }
+        }
+
+        /* Color Picker custom styles */
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-[#05070a] text-slate-100 flex flex-col justify-between items-center relative overflow-x-hidden selection:bg-[#ff2a6d]/30 selection:text-white">
+
+    <!-- Start Landing Overlay -->
+    <div id="landingOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#05070a]/95 backdrop-blur-md transition-opacity duration-700 cursor-pointer p-6 text-center select-none">
+        <!-- Floating Ambient Canvas for particle background -->
+        <canvas id="particlesCanvas" class="absolute inset-0 pointer-events-none"></canvas>
+
+        <div class="relative z-10 flex flex-col items-center space-y-6 max-w-sm w-full">
+            <div class="relative">
+                <div class="w-24 h-24 rounded-full bg-[#ff2a6d]/10 border border-[#ff2a6d]/30 flex items-center justify-center pulse-slow text-[#ff2a6d] text-4xl shadow-[0_0_50px_rgba(255,42,109,0.3)]">
+                    <i class="fas fa-heart"></i>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                    Toca para abrir, mi amor
+                </h1>
+                <p class="text-sm text-zinc-400 font-mono">
+                    Tus matemáticas y mis códigos
+                </p>
+            </div>
+
+            <div class="mt-4 px-5 py-2.5 rounded-full border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-400 font-mono flex items-center space-x-2">
+                <i class="fas fa-mouse-pointer text-[#ff2a6d] animate-bounce"></i>
+                <span>Haz clic o toca en cualquier lugar</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Centralized Container for Symmetric Layout -->
+    <div class="w-full max-w-xl mx-auto px-4 py-4 flex flex-col items-center justify-center min-h-screen space-y-3">
+        <!-- Main Application Header -->
+        <header class="w-full flex flex-col items-center justify-center z-10">
+            <!-- Formula Container rendered with KaTeX -->
+            <div id="katexFormula" class="w-full text-center py-2.5 px-3 rounded-2xl bg-zinc-950/70 border border-zinc-900/80 shadow-inner overflow-x-auto text-xs sm:text-sm min-h-[64px] flex items-center justify-center">
+                <!-- KaTeX fallback script renders here -->
+                <span class="text-zinc-500 font-mono text-xs">Cargando fórmula matemática...</span>
+            </div>
+        </header>
+
+        <!-- Main Canvas Interactive Display Area -->
+        <main class="w-full z-10 flex flex-col items-center justify-center">
+            <div class="relative w-full aspect-square rounded-2xl bg-zinc-950/90 border border-zinc-900 shadow-2xl overflow-hidden flex items-center justify-center group">
+                
+                <canvas id="heartCanvas" class="w-full h-full cursor-crosshair block"></canvas>
+
+                <!-- Coordinate Readout Badge -->
+                <div id="coordBadge" class="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-zinc-900/80 border border-zinc-800 backdrop-blur-sm text-[10px] font-mono text-zinc-300 flex items-center space-x-2 pointer-events-none">
+                    <div>X: <span id="xVal" class="text-white font-semibold">0.00</span></div>
+                    <div>Y: <span id="yVal" class="text-white font-semibold">0.00</span></div>
+                    <div>t: <span id="tVal" class="text-[#ff2a6d] font-semibold">0.00 rad</span></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Controls & Palette Footer -->
+        <footer class="w-full space-y-2.5 z-10">
+            <!-- Action Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-2 rounded-2xl bg-zinc-950/80 border border-zinc-900">
+                <!-- Play / Pause & Reset Controls -->
+                <div class="flex items-center space-x-2">
+                    <button id="playPauseBtn" class="px-3.5 py-1.5 rounded-xl bg-[#ff2a6d] hover:bg-[#ff2a6d]/80 text-white font-medium text-xs flex items-center space-x-2 transition-all">
+                        <i class="fas fa-play text-[10px]"></i>
+                        <span>Reproducir</span>
+                    </button>
+                    <button id="resetBtn" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs flex items-center space-x-1.5 transition-all">
+                        <i class="fas fa-rotate-left text-[10px]"></i>
+                        <span>Reiniciar</span>
+                    </button>
+                </div>
+
+                <!-- Visual Toggles -->
+                <div class="flex items-center space-x-2">
+                    <button id="toggleGlowBtn" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[#ff2a6d] text-xs flex items-center space-x-1.5 transition-all border border-[#ff2a6d]/30">
+                        <i class="fas fa-wand-magic-sparkles text-[10px]"></i>
+                        <span>Neón</span>
+                    </button>
+                    <button id="toggleGridBtn" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs flex items-center space-x-1.5 transition-all">
+                        <i class="fas fa-border-all text-[10px]"></i>
+                        <span>Malla</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Color Selector Palette -->
+            <div class="flex items-center justify-between px-3 py-2 bg-zinc-950/80 border border-zinc-900 rounded-xl">
+                <span class="text-xs text-zinc-400 font-mono">Color:</span>
+                <div class="flex items-center space-x-2">
+                    <button data-color="#ff2a6d" class="color-preset w-5 h-5 rounded-full bg-[#ff2a6d] ring-2 ring-white/80 transition-transform hover:scale-110"></button>
+                    <button data-color="#ff0055" class="color-preset w-5 h-5 rounded-full bg-[#ff0055] transition-transform hover:scale-110"></button>
+                    <button data-color="#00f0ff" class="color-preset w-5 h-5 rounded-full bg-[#00f0ff] transition-transform hover:scale-110"></button>
+                    <button data-color="#00ff88" class="color-preset w-5 h-5 rounded-full bg-[#00ff88] transition-transform hover:scale-110"></button>
+                    <button data-color="#b026ff" class="color-preset w-5 h-5 rounded-full bg-[#b026ff] transition-transform hover:scale-110"></button>
+                    <button data-color="#ffd700" class="color-preset w-5 h-5 rounded-full bg-[#ffd700] transition-transform hover:scale-110"></button>
+                    <button data-color="#ffffff" class="color-preset w-5 h-5 rounded-full bg-[#ffffff] transition-transform hover:scale-110"></button>
+                    
+                    <!-- Custom Color Picker Input -->
+                    <label class="relative w-5 h-5 rounded-full overflow-hidden cursor-pointer border border-zinc-700 bg-zinc-800 flex items-center justify-center hover:scale-110 transition-transform">
+                        <input type="color" id="customColorPicker" value="#ff2a6d" class="absolute inset-0 w-8 h-8 -top-1 -left-1 cursor-pointer opacity-0">
+                        <i class="fas fa-plus text-[9px] text-zinc-400 pointer-events-none"></i>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Speed & Line Width Adjustment Sliders -->
+            <div class="grid grid-cols-2 gap-3 w-full px-3 py-2 bg-zinc-950/80 border border-zinc-900 rounded-xl text-xs text-zinc-400">
+                <div class="flex flex-col space-y-1">
+                    <div class="flex justify-between text-[11px]">
+                        <span>Velocidad:</span>
+                        <span id="speedValue" class="text-zinc-200 font-mono">0.2x</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="0.2" max="3.0" step="0.1" value="0.2" class="cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none">
+                </div>
+
+                <div class="flex flex-col space-y-1">
+                    <div class="flex justify-between text-[11px]">
+                        <span>Grosor:</span>
+                        <span id="widthValue" class="text-zinc-200 font-mono">3.5px</span>
+                    </div>
+                    <input type="range" id="widthSlider" min="1" max="6" step="0.5" value="3.5" class="cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none">
+                </div>
+            </div>
+
+            <!-- Dedicated Romantic Subtext Footer Bar -->
+            <div class="w-full text-center py-2 px-3 rounded-xl bg-zinc-950/50 border border-zinc-900/60 text-xs text-zinc-400 font-mono">
+                Tus matemáticas y mis códigos <span id="heartIconFooter" class="text-[#ff2a6d]">❤️</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- JavaScript Engine -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // KaTeX Formula Rendering
+            const katexFormulaEl = document.getElementById('katexFormula');
+            if (window.katex && katexFormulaEl) {
+                katex.render(
+                    "\\begin{cases} x = 16 \\sin^3(t) \\\\ y = 13 \\cos(t) - 5 \\cos(2t) - 2 \\cos(3t) - \\cos(4t) \\end{cases}",
+                    katexFormulaEl,
+                    { displayMode: true, throwOnError: false }
+                );
+            }
+
+            // Canvas & Context setup
+            const canvas = document.getElementById('heartCanvas');
+            const ctx = canvas ? canvas.getContext('2d') : null;
+
+            if (!canvas || !ctx) {
+                console.error("Canvas element or 2D Context initialization failed.");
+                return;
+            }
+
+            // Controls & UI elements
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const toggleGlowBtn = document.getElementById('toggleGlowBtn');
+            const toggleGridBtn = document.getElementById('toggleGridBtn');
+            const speedSlider = document.getElementById('speedSlider');
+            const speedValue = document.getElementById('speedValue');
+            const widthSlider = document.getElementById('widthSlider');
+            const widthValue = document.getElementById('widthValue');
+            const colorPresets = document.querySelectorAll('.color-preset');
+            const customColorPicker = document.getElementById('customColorPicker');
+            const landingOverlay = document.getElementById('landingOverlay');
+            const heartIconFooter = document.getElementById('heartIconFooter');
+
+            // Coordinate Readouts
+            const xValEl = document.getElementById('xVal');
+            const yValEl = document.getElementById('yVal');
+            const tValEl = document.getElementById('tVal');
+
+            // Theme & Color State
+            let currentHeartColor = '#ff2a6d';
+
+            // Animation State
+            let animationProgress = 0;
+            let isPlaying = false;
+            let isGlowEnabled = true;
+            let isGridEnabled = true;
+            let animSpeed = 0.2; // Speed starts at 0.2x
+            let lineWidth = 3.5;
+
+            // Parametric Equation Sampling
+            const TOTAL_SAMPLES = 800;
+            const heartPoints = [];
+            for (let i = 0; i <= TOTAL_SAMPLES; i++) {
+                const t = (i / TOTAL_SAMPLES) * 2 * Math.PI;
+                const x = 16 * Math.pow(Math.sin(t), 3);
+                const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+                heartPoints.push({ t, x, y });
+            }
+
+            // Canvas Size Handler
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                ctx.scale(dpr, dpr);
+            }
+
+            resizeCanvas();
+
+            // Coordinate Conversion (Math to Canvas Pixel)
+            const SCALE = 12; // Pixel units per mathematical unit
+            function mathToPixel(x, y, width, height) {
+                const centerX = width / 2;
+                const centerY = height / 2 + 10; // Slightly center vertically
+                return {
+                    x: centerX + x * (width / 42),
+                    y: centerY - y * (height / 42)
+                };
+            }
+
+            function pixelToMath(px, py, width, height) {
+                const centerX = width / 2;
+                const centerY = height / 2 + 10;
+                return {
+                    x: (px - centerX) / (width / 42),
+                    y: (centerY - py) / (height / 42)
+                };
+            }
+
+            // Hex Color Helper to RGBA
+            function hexToRgba(hex, alpha) {
+                let c = hex.replace('#', '');
+                if (c.length === 3) c = c.split('').map(x => x + x).join('');
+                const num = parseInt(c, 16);
+                return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+            }
+
+            // Render Cartesian Grid
+            function drawGrid(width, height) {
+                if (!isGridEnabled) return;
+
+                ctx.save();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#18181b';
+
+                const step = width / 42;
+                const centerX = width / 2;
+                const centerY = height / 2 + 10;
+
+                // Draw secondary grid lines
+                ctx.beginPath();
+                for (let x = centerX % step; x < width; x += step) {
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                }
+                for (let y = centerY % step; y < height; y += step) {
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                }
+                ctx.stroke();
+
+                // Draw Main Axes
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = '#3f3f46';
+                ctx.beginPath();
+                // X axis
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                // Y axis
+                ctx.moveTo(centerX, 0);
+                ctx.lineTo(centerX, height);
+                ctx.stroke();
+
+                // Axis Labels
+                ctx.fillStyle = '#71717a';
+                ctx.font = '10px "Inter", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+
+                // Ticks & Numbers for X
+                for (let i = -20; i <= 20; i += 5) {
+                    if (i === 0) continue;
+                    const pt = mathToPixel(i, 0, width, height);
+                    ctx.beginPath();
+                    ctx.moveTo(pt.x, centerY - 3);
+                    ctx.lineTo(pt.x, centerY + 3);
+                    ctx.stroke();
+                    ctx.fillText(i.toString(), pt.x, centerY + 6);
+                }
+
+                // Ticks & Numbers for Y
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                for (let i = -15; i <= 15; i += 5) {
+                    if (i === 0) continue;
+                    const pt = mathToPixel(0, i, width, height);
+                    ctx.beginPath();
+                    ctx.moveTo(centerX - 3, pt.y);
+                    ctx.lineTo(centerX + 3, pt.y);
+                    ctx.stroke();
+                    ctx.fillText(i.toString(), centerX - 6, pt.y);
+                }
+
+                ctx.restore();
+            }
+
+            // Render Frame
+            function drawFrame() {
+                const rect = canvas.getBoundingClientRect();
+                const width = rect.width;
+                const height = rect.height;
+
+                ctx.clearRect(0, 0, width, height);
+                drawGrid(width, height);
+
+                const totalPoints = heartPoints.length;
+                const currentPointsCount = Math.floor(totalPoints * animationProgress);
+
+                if (currentPointsCount > 1) {
+                    ctx.save();
+                    
+                    // Glow pass
+                    if (isGlowEnabled) {
+                        ctx.shadowColor = currentHeartColor;
+                        ctx.shadowBlur = 18;
+                        
+                        ctx.strokeStyle = hexToRgba(currentHeartColor, 0.35);
+                        ctx.lineWidth = lineWidth * 2.5;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+
+                        ctx.beginPath();
+                        const startPtGlow = mathToPixel(heartPoints[0].x, heartPoints[0].y, width, height);
+                        ctx.moveTo(startPtGlow.x, startPtGlow.y);
+                        for (let i = 1; i < currentPointsCount; i++) {
+                            const pt = mathToPixel(heartPoints[i].x, heartPoints[i].y, width, height);
+                            ctx.lineTo(pt.x, pt.y);
+                        }
+                        ctx.stroke();
+                    } else {
+                        ctx.shadowBlur = 0;
+                    }
+
+                    // Main Stroke
+                    ctx.strokeStyle = currentHeartColor;
+                    ctx.lineWidth = lineWidth;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    ctx.beginPath();
+                    const startPt = mathToPixel(heartPoints[0].x, heartPoints[0].y, width, height);
+                    ctx.moveTo(startPt.x, startPt.y);
+
+                    for (let i = 1; i < currentPointsCount; i++) {
+                        const pt = mathToPixel(heartPoints[i].x, heartPoints[i].y, width, height);
+                        ctx.lineTo(pt.x, pt.y);
+                    }
+                    ctx.stroke();
+
+                    // Leading Dot Indicator
+                    const lastPtIndex = currentPointsCount - 1;
+                    const lastPt = mathToPixel(heartPoints[lastPtIndex].x, heartPoints[lastPtIndex].y, width, height);
+                    
+                    ctx.beginPath();
+                    ctx.arc(lastPt.x, lastPt.y, lineWidth * 1.3, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = currentHeartColor;
+                    ctx.shadowBlur = 14;
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+
+                // Render "Naza" at origin (0, 0) once the heart completes drawing
+                if (animationProgress >= 1.0) {
+                    const origin = mathToPixel(0, 0, width, height);
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = '600 28px "Inter", sans-serif';
+
+                    if (isGlowEnabled) {
+                        ctx.shadowColor = currentHeartColor;
+                        ctx.shadowBlur = 16;
+                    }
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText('Naza', origin.x, origin.y);
+                    ctx.restore();
+                }
+            }
+
+            // Smooth Animation Loop
+            let lastTimestamp = 0;
+            function animate(timestamp) {
+                if (!lastTimestamp) lastTimestamp = timestamp;
+                const deltaTime = (timestamp - lastTimestamp) / 1000;
+                lastTimestamp = timestamp;
+
+                if (isPlaying && animationProgress < 1.0) {
+                    // Base duration at 1.0x speed is ~5 seconds
+                    const duration = 5.0 / animSpeed;
+                    animationProgress += deltaTime / duration;
+
+                    if (animationProgress >= 1.0) {
+                        animationProgress = 1.0;
+                        isPlaying = false;
+                        playPauseBtn.innerHTML = '<i class="fas fa-play text-xs"></i><span>Reproducir</span>';
+                        playPauseBtn.classList.remove('bg-zinc-800', 'hover:bg-zinc-700', 'text-zinc-200');
+                        playPauseBtn.classList.add('bg-[#ff2a6d]', 'hover:bg-[#ff2a6d]/80', 'text-white');
+                    }
+                }
+
+                drawFrame();
+                requestAnimationFrame(animate);
+            }
+
+            requestAnimationFrame(animate);
+
+            // Responsive Resize Handling
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                drawFrame();
+            });
+
+            // Touch / Mouse Coordinate Tracker
+            function handlePointerMove(e) {
+                const rect = canvas.getBoundingClientRect();
+                const xPx = e.clientX - rect.left;
+                const yPx = e.clientY - rect.top;
+
+                const mathCoords = pixelToMath(xPx, yPx, rect.width, rect.height);
+                
+                // Estimate t parameter from click position
+                let closestIdx = 0;
+                let minSqDist = Infinity;
+                
+                for (let i = 0; i < heartPoints.length; i++) {
+                    const dx = heartPoints[i].x - mathCoords.x;
+                    const dy = heartPoints[i].y - mathCoords.y;
+                    const sqDist = dx * dx + dy * dy;
+                    if (sqDist < minSqDist) {
+                        minSqDist = sqDist;
+                        closestIdx = i;
+                    }
+                }
+
+                const pt = heartPoints[closestIdx];
+                xValEl.textContent = pt.x.toFixed(2);
+                yValEl.textContent = pt.y.toFixed(2);
+                tValEl.textContent = pt.t.toFixed(2) + ' rad';
+            }
+
+            canvas.addEventListener('mousemove', handlePointerMove);
+            canvas.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    handlePointerMove(e.touches[0]);
+                }
+            }, { passive: true });
+
+            // UI Control Event Listeners
+            playPauseBtn.addEventListener('click', () => {
+                if (animationProgress >= 1.0) {
+                    animationProgress = 0;
+                }
+                isPlaying = !isPlaying;
+                if (isPlaying) {
+                    playPauseBtn.innerHTML = '<i class="fas fa-pause text-xs"></i><span>Pausar</span>';
+                    playPauseBtn.classList.remove('bg-[#ff2a6d]', 'hover:bg-[#ff2a6d]/80', 'text-white');
+                    playPauseBtn.classList.add('bg-zinc-800', 'hover:bg-zinc-700', 'text-zinc-200');
+                } else {
+                    playPauseBtn.innerHTML = '<i class="fas fa-play text-xs"></i><span>Reproducir</span>';
+                    playPauseBtn.classList.remove('bg-zinc-800', 'hover:bg-zinc-700', 'text-zinc-200');
+                    playPauseBtn.classList.add('bg-[#ff2a6d]', 'hover:bg-[#ff2a6d]/80', 'text-white');
+                }
+            });
+
+            resetBtn.addEventListener('click', () => {
+                animationProgress = 0;
+                isPlaying = false;
+                playPauseBtn.innerHTML = '<i class="fas fa-play text-xs"></i><span>Reproducir</span>';
+                playPauseBtn.classList.remove('bg-zinc-800', 'hover:bg-zinc-700', 'text-zinc-200');
+                playPauseBtn.classList.add('bg-[#ff2a6d]', 'hover:bg-[#ff2a6d]/80', 'text-white');
+                drawFrame();
+            });
+
+            toggleGlowBtn.addEventListener('click', () => {
+                isGlowEnabled = !isGlowEnabled;
+                toggleGlowBtn.classList.toggle('text-[#ff2a6d]');
+                toggleGlowBtn.classList.toggle('text-zinc-400');
+                drawFrame();
+            });
+
+            toggleGridBtn.addEventListener('click', () => {
+                isGridEnabled = !isGridEnabled;
+                toggleGridBtn.classList.toggle('text-white');
+                toggleGridBtn.classList.toggle('text-zinc-400');
+                drawFrame();
+            });
+
+            speedSlider.addEventListener('input', (e) => {
+                animSpeed = parseFloat(e.target.value);
+                speedValue.textContent = animSpeed.toFixed(1) + 'x';
+            });
+
+            widthSlider.addEventListener('input', (e) => {
+                lineWidth = parseFloat(e.target.value);
+                widthValue.textContent = lineWidth.toFixed(1) + 'px';
+                drawFrame();
+            });
+
+            // Color Selection Function
+            function updateActiveColor(newColor) {
+                currentHeartColor = newColor;
+                document.documentElement.style.setProperty('--glow-color', hexToRgba(newColor, 0.4));
+                tValEl.style.color = newColor;
+                if (heartIconFooter) heartIconFooter.style.color = newColor;
+
+                // Update Preset borders
+                colorPresets.forEach(btn => {
+                    if (btn.dataset.color.toLowerCase() === newColor.toLowerCase()) {
+                        btn.classList.add('ring-2', 'ring-white/80');
+                    } else {
+                        btn.classList.remove('ring-2', 'ring-white/80');
+                    }
+                });
+
+                drawFrame();
+            }
+
+            colorPresets.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    updateActiveColor(btn.dataset.color);
+                });
+            });
+
+            customColorPicker.addEventListener('input', (e) => {
+                updateActiveColor(e.target.value);
+            });
+
+            // Landing Page Touch Trigger
+            landingOverlay.addEventListener('click', () => {
+                landingOverlay.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    landingOverlay.style.display = 'none';
+                    // Auto Start drawing when overlay opens
+                    isPlaying = true;
+                    playPauseBtn.innerHTML = '<i class="fas fa-pause text-xs"></i><span>Pausar</span>';
+                    playPauseBtn.classList.remove('bg-[#ff2a6d]', 'hover:bg-[#ff2a6d]/80', 'text-white');
+                    playPauseBtn.classList.add('bg-zinc-800', 'hover:bg-zinc-700', 'text-zinc-200');
+                }, 700);
+            });
+
+            // Ambient Landing Particles Canvas
+            const pCanvas = document.getElementById('particlesCanvas');
+            if (pCanvas) {
+                const pCtx = pCanvas.getContext('2d');
+                let particles = [];
+
+                function resizeParticles() {
+                    pCanvas.width = window.innerWidth;
+                    pCanvas.height = window.innerHeight;
+                }
+                resizeParticles();
+                window.addEventListener('resize', resizeParticles);
+
+                for (let i = 0; i < 35; i++) {
+                    particles.push({
+                        x: Math.random() * window.innerWidth,
+                        y: Math.random() * window.innerHeight,
+                        size: Math.random() * 3 + 1,
+                        speedY: -Math.random() * 0.8 - 0.2,
+                        opacity: Math.random() * 0.5 + 0.2
+                    });
+                }
+
+                function animateParticles() {
+                    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+                    pCtx.fillStyle = currentHeartColor;
+
+                    particles.forEach(p => {
+                        p.y += p.speedY;
+                        if (p.y < -10) p.y = pCanvas.height + 10;
+
+                        pCtx.globalAlpha = p.opacity;
+                        pCtx.beginPath();
+                        pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        pCtx.fill();
+                    });
+
+                    if (landingOverlay.style.display !== 'none') {
+                        requestAnimationFrame(animateParticles);
+                    }
+                }
+                animateParticles();
+            }
+        });
+    </script>
+</body>
+</html>
